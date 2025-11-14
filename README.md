@@ -37,7 +37,7 @@ Automatically monitors Pro Tools session folders and converts new mix files to h
 ### Quick Install
 
 ```bash
-cd /Users/payetteforward/scripts/bounce-watcher
+cd /Users/yourusername/scripts/bounce-watcher
 
 # Install dependencies
 pip3 install -r requirements.txt
@@ -82,9 +82,9 @@ mix_file_prefix = "mix"
 
 [destination]
 mode = "icloud"  # or "nas"
-icloud_path = "/Users/payetteforward/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
-nas_url = "smb://pfnas.local/music"
-nas_username = "payetteforward"
+icloud_path = "/Users/yourusername/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+nas_url = "smb://your-nas-server.local/music"
+nas_username = "yourusername"
 nas_mount_point = "/Volumes/Music"
 
 [conversion]
@@ -93,7 +93,7 @@ stability_check_interval = 2
 stability_checks_required = 3
 
 [logging]
-log_file = "/Users/payetteforward/scripts/bounce-watcher/bounce_watcher.log"
+log_file = "/Users/yourusername/scripts/bounce-watcher/bounce_watcher.log"
 level = "INFO"
 ```
 
@@ -107,8 +107,8 @@ bounce-config
 
 # Or add manually to keychain
 security add-generic-password \
-  -a payetteforward \
-  -s pfnas.local \
+  -a yourusername \
+  -s your-nas-server.local \
   -w YOUR_PASSWORD \
   -U
 ```
@@ -147,13 +147,13 @@ The service runs automatically as a LaunchAgent after installation. To manage it
 launchctl list | grep bouncewatcher
 
 # Stop the service
-launchctl stop com.payetteforward.bouncewatcher
+launchctl stop com.yourusername.bouncewatcher
 
 # Unload the service
-launchctl unload ~/Library/LaunchAgents/com.payetteforward.bouncewatcher.plist
+launchctl unload ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist
 
 # Reload the service
-launchctl load ~/Library/LaunchAgents/com.payetteforward.bouncewatcher.plist
+launchctl load ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist
 ```
 
 ### Running Manually (for testing)
@@ -226,7 +226,7 @@ Example configuration:
 ```toml
 [destination]
 mode = "icloud"
-icloud_path = "/Users/payetteforward/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+icloud_path = "/Users/yourusername/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
 ```
 
 ### NAS Mode
@@ -237,8 +237,8 @@ Example configuration:
 ```toml
 [destination]
 mode = "nas"
-nas_url = "smb://pfnas.local/music"
-nas_username = "payetteforward"
+nas_url = "smb://your-nas-server.local/music"
+nas_username = "yourusername"
 nas_mount_point = "/Volumes/Music"
 ```
 
@@ -361,13 +361,13 @@ tail -f ~/scripts/bounce-watcher/stderr.log
 1. Test NAS connection: `bounce-config --test`
 2. Verify password is in keychain:
    ```bash
-   security find-generic-password -a payetteforward -s pfnas.local
+   security find-generic-password -a yourusername -s your-nas-server.local
    ```
-3. Check NAS is accessible: `ping pfnas.local`
+3. Check NAS is accessible: `ping your-nas-server.local`
 4. Try mounting manually:
    ```bash
    mkdir -p /Volumes/Music
-   mount_smbfs //payetteforward@pfnas.local/music /Volumes/Music
+   mount_smbfs //yourusername@your-nas-server.local/music /Volumes/Music
    ```
 
 ### Service won't start
@@ -376,7 +376,7 @@ tail -f ~/scripts/bounce-watcher/stderr.log
 2. View error log: `cat ~/scripts/bounce-watcher/stderr.log`
 3. Test configuration: `bounce-config --test`
 4. Try running manually: `bounce-watcher`
-5. Check LaunchAgent plist exists: `ls -la ~/Library/LaunchAgents/com.payetteforward.bouncewatcher.plist`
+5. Check LaunchAgent plist exists: `ls -la ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist`
 
 ### High CPU usage
 
@@ -390,14 +390,14 @@ If you're upgrading from v1.0:
 
 1. **Install the new version**:
    ```bash
-   cd /Users/payetteforward/scripts/bounce-watcher
+   cd /Users/yourusername/scripts/bounce-watcher
    pip3 install -r requirements.txt
    pip3 install -e .
    ```
 
 2. **Stop the old service**:
    ```bash
-   launchctl unload ~/Library/LaunchAgents/com.payetteforward.bouncewatcher.plist
+   launchctl unload ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist
    ```
 
 3. **Run the configuration wizard**:
@@ -423,8 +423,8 @@ sample_rate = 44100  # or 96000, etc.
 
 Then restart the service:
 ```bash
-launchctl stop com.payetteforward.bouncewatcher
-launchctl start com.payetteforward.bouncewatcher
+launchctl stop com.yourusername.bouncewatcher
+launchctl start com.yourusername.bouncewatcher
 ```
 
 ### Changing the AAC bitrate
@@ -505,8 +505,8 @@ bounce-watcher                   # Run manually (foreground)
 
 # Service management
 launchctl list | grep bounce     # Check if service is running
-launchctl stop com.payetteforward.bouncewatcher
-launchctl start com.payetteforward.bouncewatcher
+launchctl stop com.yourusername.bouncewatcher
+launchctl start com.yourusername.bouncewatcher
 ```
 
 ## License

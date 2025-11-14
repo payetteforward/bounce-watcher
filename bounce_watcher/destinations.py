@@ -180,7 +180,7 @@ class DestinationManager:
             )
 
             # Look for the server in mount output
-            # Mount output will show something like: //payetteforward@pfnas.local/music on /Volumes/music
+            # Mount output will show something like: //username@server.local/share on /Volumes/share
             for line in result.stdout.splitlines():
                 if server in line and share in line.lower():
                     # Extract the actual mount point from the line

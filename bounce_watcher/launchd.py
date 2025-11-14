@@ -23,7 +23,8 @@ class LaunchAgentManager:
     """
 
     # LaunchAgent configuration
-    LABEL = "com.payetteforward.bouncewatcher"
+    # Uses reverse domain notation - customize for your organization/username
+    LABEL = "com.bouncewatcher.daemon"
     PLIST_FILENAME = f"{LABEL}.plist"
 
     def __init__(self, script_path: Optional[Path] = None):
