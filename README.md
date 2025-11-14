@@ -101,7 +101,7 @@ Configuration is stored in `~/.config/bounce-watcher/config.toml`:
 ```toml
 [source]
 mode = "specific_folders"  # or "all_external_drives"
-folders = ["/Volumes/Great 8", "/Volumes/Crazy 8"]
+folders = ["/Volumes/External SSD", "/Volumes/Studio Drive"]
 audio_files_folder = "Audio Files"
 mix_file_prefix = "mix"
 
@@ -203,7 +203,7 @@ Example configuration:
 ```toml
 [source]
 mode = "specific_folders"
-folders = ["/Volumes/Great 8", "/Volumes/Crazy 8"]
+folders = ["/Volumes/External SSD", "/Volumes/Studio Drive"]
 ```
 
 ### All External Drives Mode
@@ -299,7 +299,7 @@ Perfect for local folders, external drives, or manually-mounted network shares.
 
 Expected Pro Tools session structure:
 ```
-/Volumes/Great 8/
+/Volumes/External SSD/
 └── My Pro Tools Session/
     └── Audio Files/
         ├── mix_01.wav          ← Will be processed
