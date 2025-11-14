@@ -7,6 +7,13 @@ All notable changes to Bounce Watcher will be documented in this file.
 ### Fixed
 - **Conversion Script Arguments**: Fixed bug where converter was passing full file path instead of directory to `convert_mix.sh`, causing "Usage" error
 - Script now correctly accepts optional sample_rate as third argument
+- **NAS Mount Reliability**: Optimized SMB mount handling to detect and clean up stale mounts automatically
+  - Eliminates need to manually eject before reconnecting
+  - Detects when mount exists but is not accessible (stale state)
+  - Auto-unmounts stale mounts before mounting
+  - Retry logic for "already mounted" errors
+  - Force unmount capability for stubborn mounts
+  - Verifies mount is truly accessible (read/write) before success
 
 ### Documentation
 - **macOS-Only Clarification**: Added prominent badges and notice that tool is macOS-exclusive
@@ -18,6 +25,8 @@ All notable changes to Bounce Watcher will be documented in this file.
 
 ### Changed
 - LaunchAgent label standardized to `com.bouncewatcher.daemon` (from `com.payetteforward.bouncewatcher`)
+- NAS mount verification now checks accessibility, not just mount existence
+- Unmount operations now use `diskutil` for more reliable cleanup
 
 ## [2.0.0] - 2025-11-14
 
