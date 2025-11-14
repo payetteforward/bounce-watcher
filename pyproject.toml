@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bounce-watcher"
+version = "2.0.0"
+description = "Automated Pro Tools mix file monitoring and conversion tool"
+authors = [{name = "Payette Forward"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "watchdog>=3.0.0",
+    "tomli>=2.0.0; python_version<'3.11'",
+    "tomli-w>=1.0.0",
+]
+
+[project.scripts]
+bounce-watcher = "bounce_watcher.main:main"
+bounce-config = "bounce_watcher.configure:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bounce_watcher*"]

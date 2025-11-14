@@ -1,0 +1,49 @@
+# Bounce Watcher Configuration Example
+# Copy this file to ~/.config/bounce-watcher/config.toml and customize
+
+[source]
+# Mode: "specific_folders" or "all_external_drives"
+mode = "specific_folders"
+
+# Folders to watch (only used when mode = "specific_folders")
+folders = [
+    "/Volumes/External Drive 1",
+    "/Volumes/External Drive 2"
+]
+
+# Name of the audio files folder in Pro Tools sessions
+audio_files_folder = "Audio Files"
+
+# Prefix for mix files to detect (case-insensitive)
+mix_file_prefix = "mix"
+
+[destination]
+# Mode: "icloud", "nas", or "custom"
+mode = "icloud"
+
+# iCloud Downloads path (used when mode = "icloud")
+# Default: ~/Library/Mobile Documents/com~apple~CloudDocs/Downloads
+icloud_path = "/Users/YOUR_USERNAME/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+
+# NAS settings (used when mode = "nas")
+nas_url = "smb://your-nas-server.local/share-name"
+nas_username = "your-username"
+nas_mount_point = "/Volumes/YourNAS"
+
+# Custom folder (used when mode = "custom")
+custom_path = "/Users/YOUR_USERNAME/Music/Converted Mixes"
+
+[conversion]
+# Target sample rate in Hz
+sample_rate = 48000
+
+# File stability checking (ensures file is fully written before converting)
+stability_check_interval = 2  # seconds between checks
+stability_checks_required = 3  # consecutive checks required
+
+[logging]
+# Log file location
+log_file = "/Users/YOUR_USERNAME/bounce-watcher/bounce_watcher.log"
+
+# Log level: DEBUG, INFO, WARNING, ERROR
+level = "INFO"
