@@ -50,7 +50,7 @@ class AudioConverter:
 
         Args:
             input_file: Path to input audio file
-            output_file: Path to output M4A file
+            output_file: Path to output M4A file (the script will use the directory)
 
         Raises:
             ConversionError: If conversion fails
@@ -69,20 +69,21 @@ class AudioConverter:
 
         self.logger.info(f"Starting conversion: {input_path.name} ({format_file_size(input_size)})")
         self.logger.debug(f"Input: {input_file}")
-        self.logger.debug(f"Output: {output_file}")
+        self.logger.debug(f"Output directory: {output_path.parent}")
         self.logger.debug(f"Sample rate: {self.sample_rate} Hz")
 
         # Ensure output directory exists
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_dir = output_path.parent
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Run conversion script
+        # Run conversion script (pass directory, not full file path)
         start_time = time.time()
         try:
             result = subprocess.run(
                 [
                     str(self.script_path),
                     str(input_path),
-                    str(output_path),
+                    str(output_dir),  # Script expects directory, not file path
                     str(self.sample_rate)
                 ],
                 capture_output=True,
@@ -92,19 +93,25 @@ class AudioConverter:
 
             duration = time.time() - start_time
 
-            # Verify output file was created
-            if not output_path.exists():
-                raise ConversionError("Output file was not created")
+            # Script may have created a unique filename, so find the actual output file
+            # Look for files matching the base name in the output directory
+            base_name = input_path.stem  # filename without extension
+            output_files = list(output_dir.glob(f"{base_name}*.m4a"))
 
-            output_size = output_path.stat().st_size
-            compression_ratio = (1 - output_size / input_size) * 100 if input_size > 0 else 0
+            # Find the most recently modified file matching the pattern
+            if output_files:
+                actual_output = max(output_files, key=lambda p: p.stat().st_mtime)
+                output_size = actual_output.stat().st_size
+                compression_ratio = (1 - output_size / input_size) * 100 if input_size > 0 else 0
 
-            self.logger.info(
-                f"Conversion complete: {output_path.name} "
-                f"({format_file_size(output_size)}, "
-                f"{compression_ratio:.1f}% smaller, "
-                f"took {format_duration(duration)})"
-            )
+                self.logger.info(
+                    f"Conversion complete: {actual_output.name} "
+                    f"({format_file_size(output_size)}, "
+                    f"{compression_ratio:.1f}% smaller, "
+                    f"took {format_duration(duration)})"
+                )
+            else:
+                raise ConversionError(f"Output file was not created in {output_dir}")
 
             # Log conversion script output if in debug mode
             if result.stdout:

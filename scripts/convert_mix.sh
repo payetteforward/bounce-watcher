@@ -3,7 +3,7 @@
 # Converts audio files to Apple-Recommended 256 kbps AAC (M4A)
 # Uses Apple's afconvert pipeline with intermediate CAF + Sound Check.
 #
-# Usage: convert_mix.sh <input_file> <output_directory>
+# Usage: convert_mix.sh <input_file> <output_directory> [sample_rate]
 
 set -euo pipefail
 
@@ -11,23 +11,20 @@ set -euo pipefail
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 # Check arguments
-if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 <input_file> <output_directory>" >&2
+if [[ $# -lt 2 || $# -gt 3 ]]; then
+  echo "Usage: $0 <input_file> <output_directory> [sample_rate]" >&2
   exit 1
 fi
 
 inpath="$1"
 target_dir="$2"
+final_sample_rate="${3:-48000}"  # Use third argument or default to 48000
 
 # Validate input file exists
 if [[ ! -f "$inpath" ]]; then
   echo "Error: Input file does not exist: $inpath" >&2
   exit 1
 fi
-
-# Final "production" sample rate for distribution
-# Default is 48000 Hz as requested.
-final_sample_rate=48000
 
 # Make sure target directory exists
 mkdir -p "$target_dir"
