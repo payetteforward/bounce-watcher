@@ -5,6 +5,7 @@ Provides a CLI wizard for setting up Bounce Watcher configuration.
 """
 
 import sys
+import subprocess
 import getpass
 from pathlib import Path
 from typing import Optional
@@ -662,6 +663,141 @@ def test_configuration():
         print(f"✗ Destination configuration failed: {e}")
 
 
+def uninstall_bounce_watcher():
+    """Completely uninstall Bounce Watcher service and configuration."""
+    print_header("BOUNCE WATCHER UNINSTALL")
+
+    print("This will completely remove Bounce Watcher from your system:")
+    print("  - Stop and unload the background service")
+    print("  - Remove the LaunchAgent")
+    print("  - Delete the configuration file")
+    print("  - Remove all log files")
+    print("\nThe Python package will remain installed (use 'pip uninstall bounce-watcher' to remove it)")
+
+    if not get_yes_no("\n⚠️  Are you sure you want to uninstall?", default=False):
+        print("Uninstall cancelled.")
+        return
+
+    # Track what was removed
+    removed_items = []
+    errors = []
+
+    # 1. Stop and remove LaunchAgent
+    print("\n" + "-" * 80)
+    print("Removing LaunchAgent service...")
+    print("-" * 80)
+    try:
+        launch_mgr = get_launch_agent_manager()
+        if launch_mgr.is_installed():
+            launch_mgr.uninstall()
+            removed_items.append(f"LaunchAgent: {launch_mgr.plist_path}")
+        else:
+            print("No LaunchAgent found (already removed)")
+    except LaunchdError as e:
+        errors.append(f"Failed to remove LaunchAgent: {e}")
+        print(f"✗ {errors[-1]}")
+
+    # 2. Remove configuration file
+    print("\n" + "-" * 80)
+    print("Removing configuration...")
+    print("-" * 80)
+    config = Config()
+    if config.exists():
+        try:
+            config.config_path.unlink()
+            removed_items.append(f"Configuration: {config.config_path}")
+            print(f"✓ Removed: {config.config_path}")
+        except Exception as e:
+            errors.append(f"Failed to remove config: {e}")
+            print(f"✗ {errors[-1]}")
+    else:
+        print("No configuration file found (already removed)")
+
+    # 3. Remove log files
+    print("\n" + "-" * 80)
+    print("Removing log files...")
+    print("-" * 80)
+    config_dir = config.config_path.parent
+    if config_dir.exists():
+        log_files = list(config_dir.glob("*.log"))
+        if log_files:
+            for log_file in log_files:
+                try:
+                    log_file.unlink()
+                    removed_items.append(f"Log: {log_file}")
+                    print(f"✓ Removed: {log_file}")
+                except Exception as e:
+                    errors.append(f"Failed to remove {log_file}: {e}")
+                    print(f"✗ {errors[-1]}")
+        else:
+            print("No log files found")
+
+        # Remove config directory if empty
+        try:
+            if not any(config_dir.iterdir()):
+                config_dir.rmdir()
+                removed_items.append(f"Directory: {config_dir}")
+                print(f"✓ Removed empty directory: {config_dir}")
+        except Exception:
+            pass  # Directory not empty, that's okay
+    else:
+        print("Configuration directory not found")
+
+    # 4. Check for old LaunchAgents (cleanup from previous versions)
+    print("\n" + "-" * 80)
+    print("Checking for old LaunchAgents...")
+    print("-" * 80)
+    old_labels = [
+        "com.payetteforward.bouncewatcher",
+        "com.yourusername.bouncewatcher",
+    ]
+    plist_dir = Path.home() / "Library" / "LaunchAgents"
+    for old_label in old_labels:
+        old_plist = plist_dir / f"{old_label}.plist"
+        if old_plist.exists():
+            try:
+                # Try to unload first
+                subprocess.run(
+                    ["launchctl", "unload", str(old_plist)],
+                    capture_output=True,
+                    check=False  # Don't raise if already unloaded
+                )
+                old_plist.unlink()
+                removed_items.append(f"Old LaunchAgent: {old_plist}")
+                print(f"✓ Removed old LaunchAgent: {old_plist}")
+            except Exception as e:
+                errors.append(f"Failed to remove {old_plist}: {e}")
+                print(f"✗ {errors[-1]}")
+
+    # Summary
+    print("\n" + "=" * 80)
+    print("UNINSTALL SUMMARY")
+    print("=" * 80)
+
+    if removed_items:
+        print(f"\n✓ Successfully removed {len(removed_items)} item(s):")
+        for item in removed_items:
+            print(f"  - {item}")
+
+    if errors:
+        print(f"\n✗ Encountered {len(errors)} error(s):")
+        for error in errors:
+            print(f"  - {error}")
+
+    if not errors:
+        print("\n✅ Bounce Watcher has been completely uninstalled!")
+        print("\nTo remove the Python package:")
+        print("  pip3 uninstall bounce-watcher")
+        print("\nTo reinstall:")
+        print("  pip3 install -e .")
+        print("  bounce-config")
+    else:
+        print("\n⚠️  Uninstall completed with some errors.")
+        print("You may need to manually remove remaining files.")
+
+    print()
+
+
 def main():
     """Main entry point for bounce-config utility."""
     # Parse command line arguments
@@ -673,13 +809,17 @@ def main():
         elif arg in ["--test", "-t"]:
             test_configuration()
             return
+        elif arg in ["--uninstall", "-u"]:
+            uninstall_bounce_watcher()
+            return
         elif arg in ["--help", "-h"]:
             print("Bounce Watcher Configuration Utility")
             print("\nUsage:")
-            print("  bounce-config              Run interactive configuration wizard")
-            print("  bounce-config --status     Show current status")
-            print("  bounce-config --test       Test current configuration")
-            print("  bounce-config --help       Show this help message")
+            print("  bounce-config                Run interactive configuration wizard")
+            print("  bounce-config --status       Show current status")
+            print("  bounce-config --test         Test current configuration")
+            print("  bounce-config --uninstall    Completely remove Bounce Watcher")
+            print("  bounce-config --help         Show this help message")
             return
         else:
             print(f"Unknown option: {arg}")
