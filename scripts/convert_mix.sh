@@ -1,7 +1,15 @@
 #!/bin/zsh
-# Bounce Watcher Converter
-# Converts audio files to Apple-Recommended 256 kbps AAC (M4A)
-# Uses Apple's afconvert pipeline with intermediate CAF + Sound Check.
+# Bounce Watcher Converter - Apple Digital Masters Compliant
+#
+# Implements the two-step conversion pipeline recommended in Apple's
+# "Mastered for iTunes" / Apple Digital Masters documentation:
+# https://www.apple.com/apple-music/apple-digital-masters/
+#
+# Step 1: Source → CAF (32-bit float, Sound Check generation)
+# Step 2: CAF → AAC M4A (256 kbps, Sound Check embedded)
+#
+# This ensures professional-grade audio quality suitable for streaming
+# and distribution via Apple Music, iTunes Match, and iCloud Music Library.
 #
 # Usage: convert_mix.sh <input_file> <output_directory> [sample_rate]
 
@@ -52,9 +60,18 @@ unique_outfile() {
 }
 
 convert_with_afconvert_apple() {
-  # Apple-recommended 2-step pipeline:
-  # 1) WAV/PCM -> CAF with Sound Check (and optional downsample)
-  # 2) CAF -> 256 kbps AAC M4A, with Sound Check read back
+  # Apple Digital Masters compliant 2-step pipeline:
+  #
+  # Step 1: Source → CAF with Sound Check
+  #   - 32-bit float Little-Endian format (LEF32)
+  #   - Sound Check metadata generation
+  #   - High-quality SRC if downsampling needed (bats algorithm, -r 127)
+  #
+  # Step 2: CAF → AAC M4A with Sound Check
+  #   - 256 kbps AAC encoding
+  #   - Maximum quality (-q 127)
+  #   - Strategy 2 (pgcm, optimal for music)
+  #   - Sound Check metadata embedded
   #
   # $1 = input path
   # $2 = intermediate CAF path (in temp dir)

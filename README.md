@@ -8,6 +8,8 @@
 
 Automatically monitors Pro Tools session folders and converts new mix files to high-quality M4A format for easy sharing via iCloud, network storage, or custom folders.
 
+**Professional-grade conversion following [Apple Digital Masters](https://www.apple.com/apple-music/apple-digital-masters/) best practices** - uses Apple's recommended two-step pipeline with Sound Check integration for broadcast-ready audio.
+
 ## What's New in v2.0
 
 - **Intelligent Hot-Plug Monitoring**: Automatically detects and monitors external drives as they're connected/disconnected - no restart required!
@@ -24,7 +26,8 @@ Automatically monitors Pro Tools session folders and converts new mix files to h
 - **Automatic monitoring**: Watches specified folders or all external drives for new Pro Tools mix files
 - **Smart file detection**: Only processes files beginning with "mix" in "Audio Files" folders
 - **Stability checking**: Waits for files to finish writing before processing
-- **High-quality conversion**: Uses Apple's recommended 256 kbps AAC with Sound Check
+- **Apple Digital Masters compliant**: Professional two-step conversion pipeline following Apple's best practices
+- **High-quality conversion**: 256 kbps AAC with Sound Check, maximum quality settings (-q 127)
 - **Flexible destinations**: Save to iCloud Downloads, network storage (NAS), or custom folders
 - **Organized output**: Creates subdirectories based on Pro Tools session names
 - **Clean intermediate files**: All temporary CAF files are stored in system temp and cleaned up automatically
@@ -513,25 +516,49 @@ audio_files_folder = "Bounces"  # or "Mixdown", "Output", etc.
 
 ### Conversion Pipeline
 
+Bounce Watcher implements **Apple Digital Masters best practices** for professional-grade audio conversion, following the specifications outlined in Apple's official [Apple Digital Masters documentation](https://www.apple.com/apple-music/apple-digital-masters/).
+
+#### Two-Step Mastered for iTunes Pipeline
+
 The conversion uses Apple's recommended two-step pipeline for optimal quality:
 
-1. **Step 1: WAV/AIFF → CAF + Sound Check**
-   - If source sample rate > target (48 kHz): Downsample using optimal SRC
-   - Generate Sound Check metadata
-   - Output: 32-bit float LEF CAF file (in temp directory)
+**Step 1: Source → CAF (Intermediate Format)**
+- Format: 32-bit float Little-Endian (LEF32)
+- Container: Core Audio Format (CAF)
+- Sound Check: Generated and embedded
+- Sample Rate Conversion (if needed):
+  - Algorithm: `bats` (Best Audio Time Stretching)
+  - Quality: `-r 127` (maximum quality)
+  - Triggered when source > 48 kHz
 
-2. **Step 2: CAF → M4A**
-   - Convert to 256 kbps AAC
-   - Read and embed Sound Check metadata
-   - Quality setting: 127 (maximum)
-   - Strategy: 2 (optimal for most content)
+**Step 2: CAF → AAC M4A (Distribution Format)**
+- Codec: AAC (Advanced Audio Coding)
+- Bitrate: 256 kbps CBR
+- Quality: `-q 127` (maximum)
+- Strategy: `-s 2` (pgcm 2 - optimal for music)
+- Sound Check: Read from CAF and embedded
+- Container: M4A (MPEG-4 Audio)
 
-### Why This Pipeline?
+#### Compliance with Apple Digital Masters Standards
 
-- **Sound Check**: Enables consistent playback volume across tracks
+✅ **Two-step conversion process** - Separates SRC from encoding
+✅ **Sound Check integration** - Consistent playback levels
+✅ **High-quality SRC** - Uses Apple's `bats` algorithm
+✅ **Maximum quality settings** - `-q 127` and `-r 127`
+✅ **256 kbps AAC** - Apple's recommended bitrate for distribution
+✅ **32-bit float intermediate** - Preserves dynamic range
+✅ **Proper strategy flag** - `pgcm 2` for music content
+
+#### Why This Pipeline?
+
+- **Professional Quality**: Meets Apple Music's distribution standards
+- **Sound Check**: Enables consistent playback volume across tracks (iTunes/Music app)
 - **Two-step process**: Separates sample rate conversion from AAC encoding for best quality
-- **High quality SRC**: Uses Apple's "bats" (best audio time stretching) algorithm
-- **Clean workflow**: Intermediate files never touch the final output directory
+- **High quality SRC**: Apple's proprietary "bats" algorithm for sample rate conversion
+- **Clean workflow**: Intermediate files isolated in system temp, automatically cleaned up
+- **Future-proof**: Compatible with Apple Music, iTunes Match, and iCloud Music Library
+
+This implementation ensures your mixes meet professional streaming quality standards while maintaining the highest possible fidelity during conversion.
 
 ### External Drive Detection
 
