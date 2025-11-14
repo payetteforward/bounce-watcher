@@ -2,6 +2,23 @@
 
 All notable changes to Bounce Watcher will be documented in this file.
 
+## [2.0.1] - 2025-11-14
+
+### Fixed
+- **Conversion Script Arguments**: Fixed bug where converter was passing full file path instead of directory to `convert_mix.sh`, causing "Usage" error
+- Script now correctly accepts optional sample_rate as third argument
+
+### Documentation
+- **macOS-Only Clarification**: Added prominent badges and notice that tool is macOS-exclusive
+- Improved installation instructions following GitHub best practices
+- Added platform compatibility section explaining macOS dependencies
+- Updated all service management commands to use correct LaunchAgent label (`com.bouncewatcher.daemon`)
+- Added custom folder destination to all examples and documentation
+- Fixed migration instructions with proper git workflow
+
+### Changed
+- LaunchAgent label standardized to `com.bouncewatcher.daemon` (from `com.payetteforward.bouncewatcher`)
+
 ## [2.0.0] - 2025-11-14
 
 ### Added

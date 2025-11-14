@@ -1,6 +1,12 @@
-# Pro Tools Bounce Watcher v2.0
+# Pro Tools Bounce Watcher
 
-Automatically monitors Pro Tools session folders and converts new mix files to high-quality M4A format for easy sharing via iCloud or network storage.
+[![macOS](https://img.shields.io/badge/macOS-10.15+-blue.svg)](https://www.apple.com/macos)
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+> **Note:** This tool is designed exclusively for macOS and uses macOS-specific features like FSEvents, LaunchAgents, Keychain, and Apple's `afconvert`. It will not work on Windows or Linux.
+
+Automatically monitors Pro Tools session folders and converts new mix files to high-quality M4A format for easy sharing via iCloud, network storage, or custom folders.
 
 ## What's New in v2.0
 
@@ -19,7 +25,7 @@ Automatically monitors Pro Tools session folders and converts new mix files to h
 - **Smart file detection**: Only processes files beginning with "mix" in "Audio Files" folders
 - **Stability checking**: Waits for files to finish writing before processing
 - **High-quality conversion**: Uses Apple's recommended 256 kbps AAC with Sound Check
-- **Flexible destinations**: Save to iCloud Downloads or network storage (NAS)
+- **Flexible destinations**: Save to iCloud Downloads, network storage (NAS), or custom folders
 - **Organized output**: Creates subdirectories based on Pro Tools session names
 - **Clean intermediate files**: All temporary CAF files are stored in system temp and cleaned up automatically
 - **Notifications**: macOS notifications for conversion status
@@ -28,25 +34,42 @@ Automatically monitors Pro Tools session folders and converts new mix files to h
 
 ## Requirements
 
-- macOS 10.15 or higher
-- Python 3.9 or higher
+- **macOS 10.15 (Catalina) or higher** (required)
+- **Python 3.9 or higher**
 - Pro Tools session folders with standard "Audio Files" structure
+- Administrator access for LaunchAgent installation (optional, for background service)
 
 ## Installation
 
-### Quick Install
+### 1. Clone the Repository
 
 ```bash
-cd /Users/yourusername/scripts/bounce-watcher
-
-# Install dependencies
-pip3 install -r requirements.txt
-
-# Install the package
-pip3 install -e .
+# Clone to your preferred location
+git clone https://github.com/payetteforward/bounce-watcher.git
+cd bounce-watcher
 ```
 
-### Run Configuration Wizard
+### 2. Install Dependencies
+
+```bash
+# Using pip (recommended)
+pip3 install -r requirements.txt
+
+# Or using pip with user install
+pip3 install --user -r requirements.txt
+```
+
+### 3. Install the Package
+
+```bash
+# Development mode (recommended for easy updates)
+pip3 install -e .
+
+# Or standard installation
+pip3 install .
+```
+
+### 4. Run Configuration Wizard
 
 ```bash
 bounce-config
@@ -54,10 +77,12 @@ bounce-config
 
 The interactive wizard will guide you through:
 1. **Source Configuration**: Choose specific folders or all external drives
-2. **Destination Configuration**: Choose iCloud or NAS (with keychain password storage)
+2. **Destination Configuration**: Choose iCloud, NAS (with keychain password storage), or custom folder
 3. **Conversion Settings**: Sample rate and stability checking parameters
 4. **Logging Settings**: Log file location and verbosity
-5. **LaunchAgent Setup**: Automatic service installation
+5. **LaunchAgent Setup**: Automatic background service installation
+
+After configuration, the service will start automatically and monitor your folders in the background.
 
 ## Configuration
 
@@ -81,11 +106,12 @@ audio_files_folder = "Audio Files"
 mix_file_prefix = "mix"
 
 [destination]
-mode = "icloud"  # or "nas"
+mode = "icloud"  # or "nas" or "custom"
 icloud_path = "/Users/yourusername/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
 nas_url = "smb://your-nas-server.local/music"
 nas_username = "yourusername"
 nas_mount_point = "/Volumes/Music"
+custom_path = "/Users/yourusername/Music/Bounce Watcher"
 
 [conversion]
 sample_rate = 48000
@@ -147,13 +173,13 @@ The service runs automatically as a LaunchAgent after installation. To manage it
 launchctl list | grep bouncewatcher
 
 # Stop the service
-launchctl stop com.yourusername.bouncewatcher
+launchctl stop com.bouncewatcher.daemon
 
 # Unload the service
-launchctl unload ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist
+launchctl unload ~/Library/LaunchAgents/com.bouncewatcher.daemon.plist
 
 # Reload the service
-launchctl load ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist
+launchctl load ~/Library/LaunchAgents/com.bouncewatcher.daemon.plist
 ```
 
 ### Running Manually (for testing)
@@ -244,6 +270,19 @@ nas_mount_point = "/Volumes/Music"
 
 Password is stored in macOS Keychain for security.
 
+### Custom Folder Mode
+
+Saves converted files to any folder you specify on your Mac or mounted network drives.
+
+Example configuration:
+```toml
+[destination]
+mode = "custom"
+custom_path = "/Users/yourusername/Music/Bounce Watcher"
+```
+
+Perfect for local folders, external drives, or manually-mounted network shares.
+
 ## How It Works
 
 1. **Monitoring**: Watches configured folders or detected external drives recursively
@@ -281,6 +320,15 @@ Output structure (iCloud mode):
 Output structure (NAS mode):
 ```
 /Volumes/Music/
+└── My Pro Tools Session/
+    ├── mix_01.m4a
+    ├── mix_final.m4a
+    └── Mix-Master.m4a
+```
+
+Output structure (custom folder mode):
+```
+/Users/yourusername/Music/Bounce Watcher/
 └── My Pro Tools Session/
     ├── mix_01.m4a
     ├── mix_final.m4a
@@ -376,7 +424,7 @@ tail -f ~/scripts/bounce-watcher/stderr.log
 2. View error log: `cat ~/scripts/bounce-watcher/stderr.log`
 3. Test configuration: `bounce-config --test`
 4. Try running manually: `bounce-watcher`
-5. Check LaunchAgent plist exists: `ls -la ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist`
+5. Check LaunchAgent plist exists: `ls -la ~/Library/LaunchAgents/com.bouncewatcher.daemon.plist`
 
 ### High CPU usage
 
@@ -388,28 +436,38 @@ tail -f ~/scripts/bounce-watcher/stderr.log
 
 If you're upgrading from v1.0:
 
-1. **Install the new version**:
+1. **Navigate to your installation directory**:
    ```bash
-   cd /Users/yourusername/scripts/bounce-watcher
+   cd bounce-watcher  # or wherever you cloned it
+   ```
+
+2. **Pull the latest changes**:
+   ```bash
+   git pull
+   ```
+
+3. **Update dependencies and reinstall**:
+   ```bash
    pip3 install -r requirements.txt
    pip3 install -e .
    ```
 
-2. **Stop the old service**:
+4. **Stop and remove the old service** (if it exists):
    ```bash
-   launchctl unload ~/Library/LaunchAgents/com.yourusername.bouncewatcher.plist
+   launchctl unload ~/Library/LaunchAgents/com.payetteforward.bouncewatcher.plist 2>/dev/null || true
+   rm ~/Library/LaunchAgents/com.payetteforward.bouncewatcher.plist 2>/dev/null || true
    ```
 
-3. **Run the configuration wizard**:
+5. **Run the configuration wizard**:
    ```bash
    bounce-config
    ```
 
    Your old settings from `bounce_watcher.py` will be migrated to the new TOML config format.
 
-4. **The new service will be installed automatically** by the wizard.
+6. **The new service will be installed automatically** by the wizard.
 
-5. **Your old files are preserved** - the new package structure doesn't overwrite them.
+7. **Your old files are preserved** - the new package structure doesn't overwrite them.
 
 ## Advanced Configuration
 
@@ -423,8 +481,8 @@ sample_rate = 44100  # or 96000, etc.
 
 Then restart the service:
 ```bash
-launchctl stop com.yourusername.bouncewatcher
-launchctl start com.yourusername.bouncewatcher
+launchctl stop com.bouncewatcher.daemon
+launchctl start com.bouncewatcher.daemon
 ```
 
 ### Changing the AAC bitrate
@@ -505,13 +563,27 @@ bounce-watcher                   # Run manually (foreground)
 
 # Service management
 launchctl list | grep bounce     # Check if service is running
-launchctl stop com.yourusername.bouncewatcher
-launchctl start com.yourusername.bouncewatcher
+launchctl stop com.bouncewatcher.daemon
+launchctl start com.bouncewatcher.daemon
 ```
+
+## Platform Compatibility
+
+**macOS Only** - This tool is designed exclusively for macOS and will not work on other platforms because it uses:
+- **FSEvents**: macOS file system event monitoring API
+- **LaunchAgents**: macOS background service management system
+- **Keychain**: macOS secure credential storage
+- **afconvert**: Apple's audio conversion utility (pre-installed on macOS)
+- **osascript**: AppleScript for mounting network volumes
+- **/Volumes**: macOS mount point convention
+
+If you're looking for a cross-platform audio conversion tool, you may want to explore alternatives built with platform-independent libraries.
 
 ## License
 
-This is a personal automation script. Use and modify as needed.
+MIT License - See [LICENSE](LICENSE) file for details.
+
+This project is free and open source. Use, modify, and distribute as needed.
 
 ## Support
 
