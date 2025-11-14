@@ -155,12 +155,15 @@ class DestinationManager:
 
         return str(session_folder.absolute())
 
-    def is_nas_mounted(self) -> bool:
+    def is_nas_mounted(self, check_accessibility: bool = True) -> bool:
         """
-        Check if NAS is currently mounted.
+        Check if NAS is currently mounted and optionally verify it's accessible.
+
+        Args:
+            check_accessibility: If True, also verify the mount is accessible (not stale)
 
         Returns:
-            True if NAS is mounted, False otherwise
+            True if NAS is mounted (and accessible if requested), False otherwise
         """
         if not self.nas_url:
             return False
@@ -191,12 +194,33 @@ class DestinationManager:
                             mount_point = parts[1].split(" (")[0].strip()
                             # Update our mount point to match reality
                             self.nas_mount_point = mount_point
-                            return True
+
+                            # Verify the mount is actually accessible if requested
+                            if check_accessibility:
+                                mount_path = Path(mount_point)
+                                # Try to list directory to verify it's not stale
+                                try:
+                                    # If we can access it, it's truly mounted
+                                    if mount_path.exists() and os.access(mount_path, os.R_OK | os.W_OK):
+                                        return True
+                                    else:
+                                        # Mount exists but is stale
+                                        return False
+                                except (OSError, PermissionError):
+                                    # Mount is stale/inaccessible
+                                    return False
+                            else:
+                                return True
 
             # Also check if our configured mount point exists
             if self.nas_mount_point:
                 mount_path = Path(self.nas_mount_point)
                 if mount_path.exists() and str(mount_path) in result.stdout:
+                    if check_accessibility:
+                        try:
+                            return os.access(mount_path, os.R_OK | os.W_OK)
+                        except (OSError, PermissionError):
+                            return False
                     return True
 
             return False
@@ -206,23 +230,36 @@ class DestinationManager:
 
     def ensure_nas_mounted(self) -> None:
         """
-        Ensure NAS is mounted, mounting if necessary.
+        Ensure NAS is mounted and accessible, handling stale mounts.
 
         Raises:
             DestinationError: If NAS cannot be mounted
         """
-        if self.is_nas_mounted():
+        # Check if already mounted and accessible
+        if self.is_nas_mounted(check_accessibility=True):
             return
+
+        # If mount exists but is stale (not accessible), unmount it first
+        if self.is_nas_mounted(check_accessibility=False):
+            print(f"Detected stale NAS mount, unmounting...")
+            try:
+                self.unmount_nas()
+            except DestinationError:
+                # If unmount fails, try to force it
+                self._force_unmount_nas()
 
         print(f"Mounting NAS at {self.nas_mount_point}...")
         self.mount_nas()
 
-    def mount_nas(self) -> None:
+    def mount_nas(self, retry: bool = True) -> None:
         """
         Mount NAS using SMB with keychain authentication.
 
         Uses macOS native mounting via osascript to avoid permission issues
         with creating mount points in /Volumes.
+
+        Args:
+            retry: If True, retry once on failure after cleaning up stale mounts
 
         Raises:
             DestinationError: If mounting fails
@@ -282,8 +319,8 @@ class DestinationManager:
             import time
             time.sleep(2)
 
-            # Verify it mounted
-            if not self.is_nas_mounted():
+            # Verify it mounted and is accessible
+            if not self.is_nas_mounted(check_accessibility=True):
                 raise DestinationError("Mount command succeeded but NAS is not accessible")
 
             print(f"Successfully mounted NAS at {self.nas_mount_point}")
@@ -294,29 +331,67 @@ class DestinationManager:
             error_msg = e.stderr.strip() if e.stderr else str(e)
             # Clean up password from error message for security
             error_msg = error_msg.replace(password, "***")
+
+            # If retry is enabled and error suggests mount already exists, try cleaning up
+            if retry and ("already" in error_msg.lower() or "in use" in error_msg.lower()):
+                print(f"Mount failed (possibly stale mount), attempting cleanup and retry...")
+                self._force_unmount_nas()
+                import time
+                time.sleep(1)
+                # Retry once without retry flag to avoid infinite loop
+                return self.mount_nas(retry=False)
+
             raise DestinationError(f"Failed to mount NAS: {error_msg}")
 
     def unmount_nas(self) -> None:
         """
-        Unmount NAS.
+        Unmount NAS gracefully.
 
         Raises:
             DestinationError: If unmounting fails
         """
-        if not self.is_nas_mounted():
+        if not self.is_nas_mounted(check_accessibility=False):
             return
 
         try:
+            # Try graceful unmount first
             subprocess.run(
-                ["umount", self.nas_mount_point],
+                ["diskutil", "unmount", self.nas_mount_point],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=10
             )
             print(f"Successfully unmounted NAS from {self.nas_mount_point}")
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.strip() if e.stderr else str(e)
             raise DestinationError(f"Failed to unmount NAS: {error_msg}")
+
+    def _force_unmount_nas(self) -> None:
+        """
+        Force unmount NAS when normal unmount fails.
+
+        This handles stale mounts that won't unmount gracefully.
+        """
+        if not self.nas_mount_point:
+            return
+
+        try:
+            # Force unmount using diskutil
+            subprocess.run(
+                ["diskutil", "unmount", "force", self.nas_mount_point],
+                capture_output=True,
+                text=True,
+                check=False,  # Don't raise on error
+                timeout=10
+            )
+            print(f"Force unmounted stale NAS mount from {self.nas_mount_point}")
+        except subprocess.TimeoutExpired:
+            # If even force unmount times out, log it but continue
+            print(f"Warning: Force unmount timed out for {self.nas_mount_point}")
+        except Exception as e:
+            # Log but don't raise - we'll try to mount anyway
+            print(f"Warning: Could not force unmount: {e}")
 
     def test_destination(self) -> bool:
         """
