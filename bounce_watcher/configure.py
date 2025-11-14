@@ -34,23 +34,38 @@ def print_section(text: str):
     print("-" * 80 + "\n")
 
 
-def get_input(prompt: str, default: Optional[str] = None) -> str:
+class GoBackException(Exception):
+    """Raised when user wants to go back in the wizard."""
+    pass
+
+
+def get_input(prompt: str, default: Optional[str] = None, allow_back: bool = False) -> str:
     """
     Get user input with optional default value.
 
     Args:
         prompt: Prompt text
         default: Default value if user presses Enter
+        allow_back: If True, allow user to type 'b' or 'back' to raise GoBackException
 
     Returns:
         User input or default value
+
+    Raises:
+        GoBackException: If user types 'b' or 'back' and allow_back is True
     """
+    back_hint = " (or 'b' to go back)" if allow_back else ""
     if default:
-        full_prompt = f"{prompt} [{default}]: "
+        full_prompt = f"{prompt} [{default}]{back_hint}: "
     else:
-        full_prompt = f"{prompt}: "
+        full_prompt = f"{prompt}{back_hint}: "
 
     value = input(full_prompt).strip()
+
+    # Check for go back command
+    if allow_back and value.lower() in ['b', 'back']:
+        raise GoBackException()
+
     return value if value else default
 
 
@@ -74,7 +89,7 @@ def get_yes_no(prompt: str, default: bool = True) -> bool:
     return value in ["y", "yes"]
 
 
-def get_choice(prompt: str, choices: list, default: int = 0) -> int:
+def get_choice(prompt: str, choices: list, default: int = 0, allow_back: bool = False) -> int:
     """
     Get choice from a list of options.
 
@@ -82,20 +97,26 @@ def get_choice(prompt: str, choices: list, default: int = 0) -> int:
         prompt: Prompt text
         choices: List of choice labels
         default: Default choice index
+        allow_back: If True, allow user to type 'b' or 'back' to return -1
 
     Returns:
-        Selected choice index
+        Selected choice index, or -1 if user chose to go back
     """
     print(f"\n{prompt}")
     for i, choice in enumerate(choices):
         marker = "*" if i == default else " "
         print(f"  {marker} {i + 1}. {choice}")
 
+    back_hint = " (or 'b' to go back)" if allow_back else ""
     while True:
-        value = input(f"\nEnter choice [1-{len(choices)}] (default: {default + 1}): ").strip()
+        value = input(f"\nEnter choice [1-{len(choices)}]{back_hint} (default: {default + 1}): ").strip().lower()
 
         if not value:
             return default
+
+        # Check for go back command
+        if allow_back and value in ['b', 'back']:
+            return -1
 
         try:
             choice_num = int(value)
@@ -104,7 +125,10 @@ def get_choice(prompt: str, choices: list, default: int = 0) -> int:
             else:
                 print(f"Please enter a number between 1 and {len(choices)}")
         except ValueError:
-            print("Please enter a valid number")
+            if allow_back:
+                print("Please enter a valid number or 'b' to go back")
+            else:
+                print("Please enter a valid number")
 
 
 def configure_source() -> dict:
@@ -113,6 +137,9 @@ def configure_source() -> dict:
 
     Returns:
         Source configuration dictionary
+
+    Raises:
+        GoBackException: If user wants to go back
     """
     print_section("SOURCE CONFIGURATION")
 
@@ -123,8 +150,13 @@ def configure_source() -> dict:
             "Specific folders (manually choose which drives/folders to watch)",
             "All external drives (automatically detect and watch all external drives)"
         ],
-        default=0
+        default=0,
+        allow_back=True
     )
+
+    # Check if user wants to go back
+    if mode_choice == -1:
+        raise GoBackException()
 
     if mode_choice == 0:
         # Specific folders mode
@@ -202,6 +234,9 @@ def configure_destination() -> dict:
 
     Returns:
         Destination configuration dictionary
+
+    Raises:
+        GoBackException: If user wants to go back
     """
     print_section("DESTINATION CONFIGURATION")
 
@@ -213,8 +248,13 @@ def configure_destination() -> dict:
             "Network storage (NAS via SMB)",
             "Custom folder"
         ],
-        default=0
+        default=0,
+        allow_back=True
     )
+
+    # Check if user wants to go back
+    if mode_choice == -1:
+        raise GoBackException()
 
     if mode_choice == 0:
         # iCloud mode
@@ -346,12 +386,16 @@ def configure_conversion() -> dict:
 
     Returns:
         Conversion configuration dictionary
+
+    Raises:
+        GoBackException: If user wants to go back
     """
     print_section("CONVERSION SETTINGS")
 
     sample_rate = get_input(
         "Target sample rate (Hz)",
-        default="48000"
+        default="48000",
+        allow_back=True
     )
 
     try:
@@ -393,20 +437,29 @@ def configure_logging() -> dict:
 
     Returns:
         Logging configuration dictionary
+
+    Raises:
+        GoBackException: If user wants to go back
     """
     print_section("LOGGING SETTINGS")
 
     default_log = str(Path.home() / "scripts" / "bounce-watcher" / "bounce_watcher.log")
     log_file = get_input(
         "Log file path",
-        default=default_log
+        default=default_log,
+        allow_back=True
     )
 
     log_level = get_choice(
         "Log level",
         ["DEBUG (verbose)", "INFO (normal)", "WARNING (errors only)"],
-        default=1
+        default=1,
+        allow_back=True
     )
+
+    # Check if user wants to go back
+    if log_level == -1:
+        raise GoBackException()
 
     level_map = {0: "DEBUG", 1: "INFO", 2: "WARNING"}
 
@@ -474,23 +527,45 @@ def configure_launchagent(config_path: Path):
 
 
 def run_interactive_wizard():
-    """Run the full interactive configuration wizard."""
+    """Run the full interactive configuration wizard with go-back support."""
     print_header("BOUNCE WATCHER CONFIGURATION WIZARD")
 
     print("This wizard will help you set up Bounce Watcher.")
     print("\nYou can reconfigure at any time by running 'bounce-config' again.")
+    print("Type 'b' or 'back' at any prompt to go to the previous step.")
 
     if not get_yes_no("\nContinue?", default=True):
         print("Configuration cancelled.")
         sys.exit(0)
 
-    # Build configuration
-    config_dict = {
-        "source": configure_source(),
-        "destination": configure_destination(),
-        "conversion": configure_conversion(),
-        "logging": configure_logging(),
-    }
+    # Configuration steps as a state machine
+    steps = [
+        ("source", "Source Configuration", configure_source),
+        ("destination", "Destination Configuration", configure_destination),
+        ("conversion", "Conversion Settings", configure_conversion),
+        ("logging", "Logging Settings", configure_logging),
+    ]
+
+    config_dict = {}
+    current_step = 0
+
+    # Navigate through configuration steps
+    while current_step < len(steps):
+        step_key, step_title, step_func = steps[current_step]
+
+        try:
+            # Run configuration step
+            config_dict[step_key] = step_func()
+            # Move to next step on success
+            current_step += 1
+
+        except GoBackException:
+            # User wants to go back
+            if current_step > 0:
+                current_step -= 1
+                print(f"\n⬅ Going back to {steps[current_step][1]}...")
+            else:
+                print("\nAlready at first step!")
 
     # Save configuration
     print_section("SAVING CONFIGURATION")
