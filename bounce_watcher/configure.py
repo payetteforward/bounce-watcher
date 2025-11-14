@@ -527,6 +527,88 @@ def configure_launchagent(config_path: Path):
         print(f"\n✗ Failed to install LaunchAgent: {e}")
 
 
+def select_sections_to_configure() -> list:
+    """
+    Let user select which sections to configure.
+
+    Returns:
+        List of section keys to configure
+    """
+    config = Config()
+    existing_config = config.exists()
+
+    if not existing_config:
+        # No existing config, must configure everything
+        return ["source", "destination", "conversion", "logging"]
+
+    # Load existing config to show current values
+    try:
+        config.load()
+    except ConfigError:
+        # Config exists but is invalid, reconfigure everything
+        return ["source", "destination", "conversion", "logging"]
+
+    print_section("SELECTIVE CONFIGURATION")
+    print("You have an existing configuration. You can:")
+    print("  1. Reconfigure everything (fresh start)")
+    print("  2. Edit specific sections only (keep other settings)")
+    print()
+
+    choice = get_choice(
+        "What would you like to do?",
+        [
+            "Reconfigure everything",
+            "Edit specific sections"
+        ],
+        default=1
+    )
+
+    if choice == 0:
+        # Reconfigure everything
+        return ["source", "destination", "conversion", "logging"]
+
+    # Let user select sections
+    print("\nSelect which sections you want to reconfigure:")
+    print("(Your current settings will be preserved for unselected sections)")
+    print()
+
+    # Show current config summary
+    print("Current configuration:")
+    if "source" in config.config:
+        mode = config.config["source"].get("mode", "unknown")
+        print(f"  Source: {mode}")
+    if "destination" in config.config:
+        mode = config.config["destination"].get("mode", "unknown")
+        print(f"  Destination: {mode}")
+    if "conversion" in config.config:
+        sr = config.config["conversion"].get("sample_rate", "unknown")
+        print(f"  Conversion: {sr} Hz")
+    if "logging" in config.config:
+        level = config.config["logging"].get("level", "unknown")
+        print(f"  Logging: {level}")
+    print()
+
+    sections = []
+
+    if get_yes_no("Reconfigure source settings?", default=False):
+        sections.append("source")
+
+    if get_yes_no("Reconfigure destination settings?", default=False):
+        sections.append("destination")
+
+    if get_yes_no("Reconfigure conversion settings?", default=False):
+        sections.append("conversion")
+
+    if get_yes_no("Reconfigure logging settings?", default=False):
+        sections.append("logging")
+
+    if not sections:
+        print("\nNo sections selected. Configuration unchanged.")
+        sys.exit(0)
+
+    return sections
+
+
 def run_interactive_wizard():
     """Run the full interactive configuration wizard with go-back support."""
     print_header("BOUNCE WATCHER CONFIGURATION WIZARD")
@@ -539,15 +621,35 @@ def run_interactive_wizard():
         print("Configuration cancelled.")
         sys.exit(0)
 
+    # Determine which sections to configure
+    sections_to_configure = select_sections_to_configure()
+
+    # Load existing configuration to preserve unmodified sections
+    config = Config()
+    if config.exists():
+        try:
+            config.load()
+            config_dict = config.config.copy()
+        except ConfigError:
+            config_dict = {}
+    else:
+        config_dict = {}
+
     # Configuration steps as a state machine
-    steps = [
+    all_steps = [
         ("source", "Source Configuration", configure_source),
         ("destination", "Destination Configuration", configure_destination),
         ("conversion", "Conversion Settings", configure_conversion),
         ("logging", "Logging Settings", configure_logging),
     ]
 
-    config_dict = {}
+    # Filter to only steps that need configuration
+    steps = [step for step in all_steps if step[0] in sections_to_configure]
+
+    if not steps:
+        print("\nNo configuration changes needed.")
+        return
+
     current_step = 0
 
     # Navigate through configuration steps
@@ -571,22 +673,44 @@ def run_interactive_wizard():
     # Save configuration
     print_section("SAVING CONFIGURATION")
 
+    # Show summary of what was configured
+    all_section_keys = ["source", "destination", "conversion", "logging"]
+    modified_sections = [key for key in all_section_keys if key in sections_to_configure]
+    preserved_sections = [key for key in all_section_keys if key not in sections_to_configure and key in config_dict]
+
+    if modified_sections:
+        print("Modified sections:")
+        for key in modified_sections:
+            print(f"  ✓ {key.capitalize()}")
+
+    if preserved_sections:
+        print("\nPreserved sections:")
+        for key in preserved_sections:
+            print(f"  ↻ {key.capitalize()} (unchanged)")
+
     config = Config()
     config.config = config_dict
 
     try:
         config.save()
-        print(f"✓ Configuration saved to: {config.config_path}")
+        print(f"\n✓ Configuration saved to: {config.config_path}")
     except ConfigError as e:
         print(f"✗ Failed to save configuration: {e}")
         sys.exit(1)
 
-    # Configure LaunchAgent
-    configure_launchagent(config.config_path)
+    # Configure LaunchAgent (only if first time or source/destination changed)
+    needs_service_restart = any(key in sections_to_configure for key in ["source", "destination"])
+    if needs_service_restart or not get_launch_agent_manager().is_installed():
+        configure_launchagent(config.config_path)
+    else:
+        print("\nService configuration unchanged. Restart service to apply changes:")
+        print("  launchctl stop com.bouncewatcher.daemon")
+        print("  launchctl start com.bouncewatcher.daemon")
 
     # Done
     print_header("CONFIGURATION COMPLETE")
-    print("Bounce Watcher is now configured and running!")
+    if modified_sections:
+        print(f"Updated {len(modified_sections)} section(s) successfully!")
     print("\nUseful commands:")
     print("  bounce-config --status    Show current status")
     print("  bounce-config --test      Test configuration")
@@ -816,10 +940,16 @@ def main():
             print("Bounce Watcher Configuration Utility")
             print("\nUsage:")
             print("  bounce-config                Run interactive configuration wizard")
+            print("                               (supports selective editing of existing config)")
             print("  bounce-config --status       Show current status")
             print("  bounce-config --test         Test current configuration")
             print("  bounce-config --uninstall    Completely remove Bounce Watcher")
             print("  bounce-config --help         Show this help message")
+            print("\nSelective Configuration:")
+            print("  If you have an existing configuration, bounce-config will let you:")
+            print("  - Edit only specific sections (e.g., just change destination folder)")
+            print("  - Keep all other settings unchanged")
+            print("  - No need to re-enter server names, passwords, etc.")
             return
         else:
             print(f"Unknown option: {arg}")

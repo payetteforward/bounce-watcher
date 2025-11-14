@@ -97,6 +97,15 @@ The easiest way to configure Bounce Watcher is using the interactive wizard:
 bounce-config
 ```
 
+**Selective Editing:** If you already have a configuration and just want to change one thing (like the destination folder), the wizard will offer to edit only specific sections. No need to re-enter everything!
+
+Example workflow:
+1. Run `bounce-config`
+2. Choose "Edit specific sections only"
+3. Select only "Reconfigure destination settings?" → Yes
+4. Change your destination folder
+5. Done! All other settings (source, NAS passwords, etc.) remain unchanged.
+
 ### Configuration File
 
 Configuration is stored in `~/.config/bounce-watcher/config.toml`:
